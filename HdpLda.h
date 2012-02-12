@@ -10,18 +10,16 @@
 class Topic
 {
 public:
-	Topic(): V(0), beta(0.0), m(0), n(0), n_v(){};
-	Topic(const int &V, const double &beta):V(V), beta(beta), m(0), n(0), n_v(V){};
-	Topic(const Topic &t): V(t.V), beta(t.beta), m(t.m), n(t.n), n_v(V){};
+	Topic(): V(0), beta(0.0), m(0), n(0), n_v(V), phi_v(V){};
+	Topic(const int &V, const double &beta):V(V), beta(beta), m(0), n(0), n_v(V), phi_v(V){};
+	Topic(const Topic &t): V(t.V), beta(t.beta), m(t.m), n(t.n), n_v(V), phi_v(V){};
 	Topic & operator =(const Topic &t){
 		V = t.V;
 		beta = t.beta;
 		m = t.m;
 		n = t.n;
-		std::vector<int> v;
-		n_v = v;
-		n_v.resize(V);
 		n_v = t.n_v;
+		phi_v = t.phi_v;
 		return *this;
 	}
 	int V;
@@ -29,6 +27,7 @@ public:
 	int m;					// この料理が乗っているテーブル数のカウント
 	int n;					// この料理を食べている人数のカウント Σ_w{n_w}
 	std::vector<int> n_v;	// この料理を食べている人のvごとのカウント
+	std::vector<double> phi_v;
 
 };
 

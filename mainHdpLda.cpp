@@ -5,10 +5,11 @@
 #include <string>
 #include <vector>
 #include <utility>
-#include <algorithm>
+#include <numeric>
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <algorithm>
 #include <boost/timer.hpp>
 #include <boost/random.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -39,9 +40,9 @@ _CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF ); // ÉÅÉÇÉäÉäÅ[ÉN
 	const double BETA = 0.5;
 
 	
-//	Corpus corpus("docword.kos\\docword.kos.txt"); // K=15~18Ç†ÇΩÇËÇ™ç≈ëP
+	Corpus corpus("docword.kos\\docword.kos.txt"); // K=15~18Ç†ÇΩÇËÇ™ç≈ëP
 //	Corpus corpus("docword.kos\\docword.smallkos.txt"); // K=15~18Ç†ÇΩÇËÇ™ç≈ëP
-	Corpus corpus("docword.kos\\docword.minimalkos.txt"); // K=15~18Ç†ÇΩÇËÇ™ç≈ëP
+//	Corpus corpus("docword.kos\\docword.minimalkos.txt"); // K=15~18Ç†ÇΩÇËÇ™ç≈ëP
 	Vocabulary vocabulary("docword.kos\\vocab.kos.txt", K);
 //	Corpus corpus("docword.nips\\docword.nips.txt"); // K=50ãﬂï”Ç™ç≈ëP
 //	Vocabulary vocabulary("docword.nips\\vocab.nips.txt", K);
@@ -51,15 +52,15 @@ _CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF ); // ÉÅÉÇÉäÉäÅ[ÉN
 //	HdpLda hdp(corpus, vocabulary, static_cast<unsigned long>(time(0)), GAMMA, ALPHA0, BETA, K);
 	HdpLda hdp(corpus, vocabulary, static_cast<unsigned long>(0), GAMMA, ALPHA0, BETA, K);
 
-	for(int i=0; i<100; ++i){
+	for(int i=0; i<1000; ++i){
 		cout << "*** " << i << " *******************************************************" << endl;
 		hdp.sampleTables();
 		cout << "hdp.m: " << hdp.m << endl;
-		cout << "hdp.topics.size(): " << hdp.topics.size() << endl;
-		cout << "hdp.topics[0].n: " << hdp.topics.front()->n << endl;
+		cout << "hdp.topics.size(): " << hdp.topics.size() << endl;	
+		cout << "hdp.topics[0].n: " << accumulate(hdp.topics.begin(), hdp.topics.end(), 0, [](int n, shared_ptr<Topic> t){return n + t->n;}) << endl;
 		cout << endl;
 	}
-//	for(int j=0; j<hdp.restaurants.size(); ++j){ cout << "[" << j << "] " << hdp.restaurants[j].tables.size() << endl; }
+	for(int j=0; j<hdp.restaurants.size(); ++j){ cout << "[" << j << "] " << hdp.restaurants[j].tables.size() << endl; }
 
 /*//	cout << "\n############### K = " << K << " : ROUND " << round << " ###################" << endl;
 	HdpLda hdp(corpus, vocabulary, static_cast<unsigned long>(time(0)), GAMMA, ALPHA0, BETA, K);
