@@ -61,7 +61,23 @@ void HdpLda::sampleTables()
 			customers[i].table->n_v[v]--;
 			customers[i].table->topic->n--;
 			customers[i].table->topic->n_v[v]--;
+			// 客がいなくなった場合はそのテーブルを削除
+			if(customers[i].table->n == 0){
+				shared_ptr<Topic> &topicOfThisTable = customers[i].table->topic;
+				tables.remove_if([](shared_ptr<Table> &table){
+					return table->n == 0;
+				});
+				topicOfThisTable->m--;
+				m--;
+				// 削除されたテーブルに乗っていた料理が、全レストランのどのテーブルにも提供されていなくなった場合はその料理をフランチャイズのメニューから削除
+				if(topicOfThisTable->m == 0){
+					topics.remove_if([](shared_ptr<Topic> &topic){
+						return topic->m == 0;
+					});
+				}
+			}
 
+			// テーブルごとの着席確率の離散累積分布を求める（ただし正規化されていない着席確率）
 			int T = tables.size();
 			vector<double> unnormalizedCDF(T + 1);
 			vector<shared_ptr<Table>> ptrTables(T);
@@ -72,11 +88,13 @@ void HdpLda::sampleTables()
 					sum += (*table)->n;
 					unnormalizedCDF[t] = sum;
 					ptrTables[t] = (*table);
+					++t;
 				}
 				sum += alpha0;
 				unnormalizedCDF[T] = sum;
 			}
 			
+			// 離散累積分布からテーブル番号をサンプリング
 			double rnd = uniform() * sum;
 			int newT = T;
 			for(int t=0; t<T+1; ++t){
@@ -86,24 +104,25 @@ void HdpLda::sampleTables()
 				}
 			}
 
+			// 着席するテーブルを更新
 			shared_ptr<Table> newTable;
-			if(newT < T){
+			if(newT < T){ // 既存のテーブルの場合
 				newTable = ptrTables[newT];
 			}
-			else{
+			else{ // 新しいテーブルの場合
 				shared_ptr<Topic> &topic = *(topics.begin()); // TODO: 新しいテーブル用にトピックをサンプリングするように
 				newTable = shared_ptr<Table>(new Table(topic));
 				tables.push_back(newTable);
+				topic->m++;
 				m++;
 			}
-
 			newTable->n++;
 			newTable->n_v[v]++;
 			newTable->topic->n++;
 			newTable->topic->n_v[v]++;
+			customers[i].table = newTable;
 		}
 	}
-
 
 
 }

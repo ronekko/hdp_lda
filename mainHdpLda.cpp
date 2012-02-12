@@ -1,3 +1,7 @@
+#define _CRTDBG_MAP_ALLOC // メモリリーク検出用コード
+#include <stdlib.h> // メモリリーク検出用コード
+#include <crtdbg.h> // メモリリーク検出用コード
+
 #include <string>
 #include <vector>
 #include <utility>
@@ -18,6 +22,7 @@ using namespace std;
 
 int main(int argc, char** argv)
 {
+_CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF ); // メモリリーク検出用コード
 	boost::timer timer;
 	string dirName;
 	{
@@ -42,6 +47,19 @@ int main(int argc, char** argv)
 //	Vocabulary vocabulary("docword.nips\\vocab.nips.txt", K);
 //	Corpus corpus("C:\\Documents and Settings\\sakurai\\My Documents\\Dataset\\Clothing2\\corpus.txt"); // K=15~18あたりが最善
 //	Vocabulary vocabulary("C:\\Documents and Settings\\sakurai\\My Documents\\Dataset\\Clothing2\\vocab.txt", K);
+
+//	HdpLda hdp(corpus, vocabulary, static_cast<unsigned long>(time(0)), GAMMA, ALPHA0, BETA, K);
+	HdpLda hdp(corpus, vocabulary, static_cast<unsigned long>(0), GAMMA, ALPHA0, BETA, K);
+
+	for(int i=0; i<100; ++i){
+		cout << "*** " << i << " *******************************************************" << endl;
+		hdp.sampleTables();
+		cout << "hdp.m: " << hdp.m << endl;
+		cout << "hdp.topics.size(): " << hdp.topics.size() << endl;
+		cout << "hdp.topics[0].n: " << hdp.topics.front()->n << endl;
+		cout << endl;
+	}
+//	for(int j=0; j<hdp.restaurants.size(); ++j){ cout << "[" << j << "] " << hdp.restaurants[j].tables.size() << endl; }
 
 /*//	cout << "\n############### K = " << K << " : ROUND " << round << " ###################" << endl;
 	HdpLda hdp(corpus, vocabulary, static_cast<unsigned long>(time(0)), GAMMA, ALPHA0, BETA, K);
@@ -87,13 +105,6 @@ int main(int argc, char** argv)
 	sst << dirName << "\\theta, K=" << K << "_" << round << ", ITER=" << ITERATION << " PERPLEXITY=" << bestPerplexity << " alpha=" << alpha << " beta=" << beta << ".txt";
 //	lda.savePhiTheta(bestPhi, ssp.str(), bestTheta, sst.str());
 */
-
-	HdpLda hdp(corpus, vocabulary, static_cast<unsigned long>(time(0)), GAMMA, ALPHA0, BETA, K);
-
-	for(int i=0; i<10; ++i){
-		hdp.sampleTables();
-		cout << hdp.m << endl;
-	}
 
 	return 0;
 }
