@@ -31,8 +31,8 @@ int main(int argc, char** argv)
 	const int K = 16;
 	const int ITERATION = 500;
 	const int INTERVAL = 50;
-	const double GAMMA = 0.5;
-	const double ALPHA0 = 0.1;
+	const double GAMMA = 0.1;
+	const double ALPHA0 = 0.5;
 	const double BETA = 0.5;
 
 	const string corpusName = "kos";	// K=15~18Ç†ÇΩÇËÇ™ç≈ëP
@@ -45,8 +45,8 @@ int main(int argc, char** argv)
 //	Corpus corpus("C:\\Documents and Settings\\sakurai\\My Documents\\Dataset\\Clothing2\\corpus.txt");
 //	Vocabulary vocabulary("C:\\Documents and Settings\\sakurai\\My Documents\\Dataset\\Clothing2\\vocab.txt", K);
 
-	HdpLda hdp(corpus, vocabulary, static_cast<unsigned long>(time(0)), GAMMA, ALPHA0, BETA, K);
-//	HdpLda hdp(corpus, vocabulary, static_cast<unsigned long>(0), GAMMA, ALPHA0, BETA, K);
+//	HdpLda hdp(corpus, vocabulary, static_cast<unsigned long>(time(0)), GAMMA, ALPHA0, BETA, K);
+	HdpLda hdp(corpus, vocabulary, static_cast<unsigned long>(0), GAMMA, ALPHA0, BETA, K);
 
 
 	// Ç¢ÇøÇŒÇÒó«Ç©Ç¡ÇΩåãâ ÇÃï€ë∂óp
@@ -94,6 +94,9 @@ int main(int argc, char** argv)
 	stringstream sst;
 	sst << dirName << "\\theta, É¡=" << GAMMA << ", Éø0=" << ALPHA0 << ", É¿" << BETA << ", ITER=" << ITERATION << "PERPLEXITY=" << bestPerplexity << ".txt";
 	hdp.savePhiTheta(bestPhi, ssp.str(), bestTheta, sst.str());
+
+	cout << "getchar()";
+	getchar();
 
 	return 0;
 }

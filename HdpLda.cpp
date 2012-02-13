@@ -1,10 +1,13 @@
 #include <cmath>
 #include <fstream>
 #include <utility>
+#include <unordered_map>
 #include <boost/random.hpp>
 #include <boost/range/algorithm.hpp>
 #include <boost/range/numeric.hpp>
+#include <boost/timer.hpp>
 #include "HdpLda.h"
+#include <omp.h>
 
 
 
@@ -185,12 +188,23 @@ void HdpLda::sampleTables(void)
 }
 
 
+inline double HdpLda::calcLogNPlusBeta(int n)
+{
+	return (cacheLogNPlusBeta.find(n) != cacheLogNPlusBeta.end()) ? cacheLogNPlusBeta[n]
+																  : (cacheLogNPlusBeta[n] = log(n + beta));
+}
+inline double HdpLda::calcLogNPlusVBeta(int n)
+{
+	return (cacheLogNPlusVBeta.find(n) != cacheLogNPlusVBeta.end()) ? cacheLogNPlusVBeta[n]
+																	: (cacheLogNPlusVBeta[n] = log(n + V * beta));
+}
 
 void HdpLda::sampleTopics(void)
 {
 	using namespace boost;
 	using std::shared_ptr;
-
+	timer timer;
+	double tm = 0.0;
 	uniform_real<> uniformDistribution(0, 1);
 	variate_generator<mt19937&, uniform_real<>> uniform(engine, uniformDistribution);
 	
@@ -198,12 +212,21 @@ void HdpLda::sampleTopics(void)
 		Restaurant &restaurant = restaurants[j];
 		vector<Customer> &customers = restaurant.customers;
 		list<shared_ptr<Table>> &tables = restaurant.tables;
-
+		
+		timer.restart();
 		for(auto it=tables.begin(); it!=tables.end(); ++it){
 			shared_ptr<Table> &table = *it;
 			shared_ptr<Topic> &oldTopic = table->topic;
 			m--;
 			oldTopic->m--;
+
+			// このテーブルに着いている単語とそのカウントを求めておく
+			vector<pair<int, int>> n_v; // n_v.first = v, n_v.second = table->n_v[v]
+			for(int v=0; v<V; ++v){
+				if(table->n_v[v] != 0){
+					n_v.push_back(pair<int, int>(v, table->n_v[v]));
+				}
+			}
 			// 料理が提供されているテーブルがなくなったらメニューから料理を削除
 			if(oldTopic->m == 0){
 				topics.remove_if([](shared_ptr<Topic> &topic){
@@ -212,8 +235,10 @@ void HdpLda::sampleTopics(void)
 			}
 			else{	
 				oldTopic->n -= table->n;
-				for(int v=0; v<V; ++v){
-					oldTopic->n_v[v] -= table->n_v[v];
+				for(int l=0; l<n_v.size(); ++l){
+					int v = n_v[l].first;
+					int count = n_v[l].second;
+					oldTopic->n_v[v] -= count;
 				}
 			}
 			
@@ -223,31 +248,38 @@ void HdpLda::sampleTopics(void)
 			vector<double> unnormalizedCDF(K + 1);
 			vector<double> logPk(K + 1, 0.0);
 			vector<shared_ptr<Topic>> ptrTopics(K);
-			int k=0;
-			for(auto it2=topics.begin(); it2!=topics.end(); ++it2){
-				shared_ptr<Topic> &topic = *it2;
-				ptrTopics[k] = *it2;
+			boost::copy(topics, ptrTopics.begin());
+
+//#pragma omp for
+			for(int k=0; k<K; ++k){
+				shared_ptr<Topic> &topic = ptrTopics[k];
 
 				logPk[k] = log(static_cast<double>(topic->m));
 				for(int i=0; i<table->n; ++i){
 					logPk[k] -= log(topic->n + i + V * beta);
-				}
-				for(int v=0; v<V; ++v){
-					for(int i=0; i<table->n_v[v]; ++i){
-						logPk[k] += log(topic->n_v[v] + i + beta);
-					}
+					//↑のようにlogを毎回計算するのは重いのでキャッシュしたものを使う
+					//logPk[k] -= calcLogNPlusVBeta(topic->n + i);
 				}
 
-				++k;
+				for(int l=0; l<n_v.size(); ++l){
+					for(int i=0; i<n_v[l].second; ++i){
+						logPk[k] += log(topic->n_v[n_v[l].first] + i + beta);
+						//↑のようにlogを毎回計算するのは重いのでキャッシュしたものを使う
+						//logPk[k] += calcLogNPlusBeta(topic->n_v[n_v[l].first] + i); 
+					}
+				}
 			}
 			// 新しい料理をサンプリングする確率の対数
 			logPk[K] = log(gamma);
 			for(int i=0; i<table->n; ++i){
 				logPk[K] -= log(i + V * beta);
+				//logPk[K] -= calcLogNPlusVBeta(i);;
 			}
-			for(int v=0; v<V; ++v){
-				for(int i=0; i<table->n_v[v]; ++i){
+			for(int l=0; l<n_v.size(); ++l){
+				for(int i=0; i<n_v[l].second; ++i){
 					logPk[K] += log(i + beta);
+					//↑のようにlogを毎回計算するのは重いのでキャッシュしたものを使う
+					//logPk[K] += calcLogNPlusBeta(i);
 				}
 			}
 			
@@ -277,13 +309,17 @@ void HdpLda::sampleTopics(void)
 			}
 			newTopic->m++;
 			newTopic->n += table->n;
-			for(int v=0; v<V; ++v){
-				newTopic->n_v[v] += table->n_v[v];
+			for(int l=0; l<n_v.size(); ++l){
+				int v = n_v[l].first;
+				int count = n_v[l].second;
+				newTopic->n_v[v] += count;
 			}
 			table->topic = newTopic;
 			m++;
 		}
+		tm += timer.elapsed();
 	}
+	cout << "\ttm="<<tm<<endl;
 }
 
 
@@ -368,6 +404,7 @@ vector<vector<double>> HdpLda::calcTheta(void)
 
 void HdpLda::savePhi(const vector<vector<double>> &phi, const string &fileName)
 {	
+	const int K = phi.size();
 	ofstream ofs(fileName.c_str());
 	for(int k=0; k<K; ++k){
 		ofs << "Topic: " << k << endl;
@@ -392,6 +429,7 @@ void HdpLda::savePhi(const vector<vector<double>> &phi, const string &fileName)
 
 void HdpLda::saveTheta(const vector<vector<double>> &theta, const string &fileName)
 {
+	const int K = theta[0].size();
 	ofstream ofs(fileName.c_str());
 	for(int j=0; j<D; ++j){
 		ofs << "Document: " << j << endl;

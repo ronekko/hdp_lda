@@ -4,6 +4,7 @@
 #include <list>
 #include <memory>
 #include <boost/random.hpp>
+#include <unordered_map>
 #include "Corpus.hpp"
 
 
@@ -56,8 +57,6 @@ public:
 
 };
 
-
-
 class Customer
 {
 public:
@@ -85,14 +84,6 @@ public:
 
 };
 
-
-//class Franchise
-//{
-//	std::vector<Restaurant> restaurants;
-//	std::list<Topic> topics;
-//};
-
-
 class HdpLda
 {
 public:
@@ -110,6 +101,9 @@ public:
 	void saveTheta(const vector<vector<double>> &theta, const string &fileName);
 	void savePhiTheta(const vector<vector<double>> &phi, const string &phiFileName,
 					const vector<vector<double>> &theta, const string &thetaFileName);
+	inline double calcLogNPlusBeta(int n);
+	inline double calcLogNPlusVBeta(int n);
+
 
 	Corpus corpus;
 	Vocabulary vocabulary;
@@ -123,6 +117,8 @@ public:
 	int K;
 	std::vector<Restaurant> restaurants;
 	std::list<std::shared_ptr<Topic>> topics;
+	std::unordered_map<int, double> cacheLogNPlusBeta; // log({n_v + i} + β)のキャッシュ。{n_v + i}がキー
+	std::unordered_map<int, double> cacheLogNPlusVBeta; // log({n_. + i} + Vβ)のキャッシュ。{n_. + i}がキー
 	int m; // 全店のテーブル数の合計
 };
 
