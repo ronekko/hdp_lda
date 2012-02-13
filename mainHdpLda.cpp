@@ -59,9 +59,10 @@ _CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF ); // ƒƒ‚ƒŠƒŠ[ƒN
 		cout << "hdp.m: " << hdp.m << endl;
 		cout << "hdp.topics.size(): " << hdp.topics.size() << endl;	
 		cout << "hdp.topics[0].n: " << boost::accumulate(hdp.topics, 0, [](int n, shared_ptr<Topic> t){return n + t->n;}) << endl;
+		cout << "Perplexity: " << hdp.calcPerplexity() << endl;
 		cout << endl;
 	}
-	for(int j=0; j<hdp.restaurants.size(); ++j){ cout << "[" << j << "] " << hdp.restaurants[j].tables.size() << endl; }
+//	for(int j=0; j<hdp.restaurants.size(); ++j){ cout << "[" << j << "] " << hdp.restaurants[j].tables.size() << endl; }
 
 /*//	cout << "\n############### K = " << K << " : ROUND " << round << " ###################" << endl;
 	HdpLda hdp(corpus, vocabulary, static_cast<unsigned long>(time(0)), GAMMA, ALPHA0, BETA, K);

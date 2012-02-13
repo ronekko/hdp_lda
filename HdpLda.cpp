@@ -1,6 +1,7 @@
 #include <cmath>
 #include <boost/random.hpp>
 #include <boost/range/algorithm.hpp>
+#include <boost/range/numeric.hpp>
 #include "HdpLda.h"
 
 
@@ -272,4 +273,55 @@ void HdpLda::sampleTopics()
 			m++;
 		}
 	}
+}
+
+double HdpLda::calcPerplexity(void)
+{
+	double perplexity = 0.0;
+	const int K = topics.size();
+	vector<vector<double>> phi(K);
+	vector<vector<double>> theta(D);
+
+	boost::for_each(phi, [&](vector<double> &phi_k){phi_k.resize(V, 0.0);});
+	boost::for_each(theta, [&](vector<double> &theta_j){theta_j.resize(K, 0.0);});
+
+	vector<shared_ptr<Topic>> ptrTopics(K);
+	boost::copy(topics, ptrTopics.begin());
+
+	// É≥ÇãÅÇﬂÇÈ
+	for(int k=0; k<K; ++k){
+		shared_ptr<Topic> &topic = ptrTopics[k];
+		for(int v=0; v<V; ++v){
+			phi[k][v] = (topic->n_v[v] + beta) / (topic->n + V * beta);
+		}
+	}
+	
+	for(int j=0; j<D; ++j){
+		const int T = restaurants[j].tables.size();
+		vector<shared_ptr<Table>> tables(T);		
+		boost::copy(restaurants[j].tables, tables.begin());
+		
+		for(int t=0; t<T; ++t){
+			int k = distance(ptrTopics.begin(), boost::find(ptrTopics, tables[t]->topic));
+			theta[j][k] += tables[t]->n;
+		}
+		for(int k=0; k<K; ++k){
+			theta[j][k] += alpha0 * (ptrTopics[k]->m + gamma / static_cast<double>(K)) / (m + gamma);
+			theta[j][k] /= (restaurants[j].n + alpha0);
+		}
+
+		vector<Customer> &customers = restaurants[j].customers;
+		for(int i=0; i<customers.size(); ++i){
+			int v = customers[i].word;
+			double p_v = 0.0;
+			for(int k=0; k<K; ++k){
+				p_v += theta[j][k] * phi[k][v];
+			}
+			perplexity -= log(p_v);
+		}
+	}
+
+	perplexity = exp(perplexity / static_cast<double>(N));
+
+	return perplexity;
 }

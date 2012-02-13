@@ -102,6 +102,9 @@ public:
 		  , const double &gamma, const double &alpha0, const double &beta, const int &K = 3);
 	void sampleTables();
 	void sampleTopics();
+	vector<vector<double>> calcPhi(void);
+	vector<vector<double>> calcTheta(void);
+	double calcPerplexity(void);
 
 	Corpus corpus;
 	Vocabulary vocabulary;
