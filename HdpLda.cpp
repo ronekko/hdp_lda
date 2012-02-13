@@ -1,4 +1,6 @@
+#include <cmath>
 #include <boost/random.hpp>
+#include <boost/range/algorithm.hpp>
 #include "HdpLda.h"
 
 
@@ -61,6 +63,7 @@ void HdpLda::sampleTables()
 			customers[i].table->n_v[v]--;
 			customers[i].table->topic->n--;
 			customers[i].table->topic->n_v[v]--;
+			int &dbg = customers[i].table->topic->n;
 			// 客がいなくなった場合はそのテーブルを削除
 			if(customers[i].table->n == 0){
 				shared_ptr<Topic> &topicOfThisTable = customers[i].table->topic;
@@ -167,10 +170,106 @@ void HdpLda::sampleTables()
 			customers[i].table = newTable;
 		}
 	}
-
-
 }
 
 
 
-void HdpLda::sampleTopics(){}
+void HdpLda::sampleTopics()
+{
+	using namespace boost;
+	using std::shared_ptr;
+
+	uniform_real<> uniformDistribution(0, 1);
+	variate_generator<mt19937&, uniform_real<>> uniform(engine, uniformDistribution);
+	
+	for(int j=0; j<D; ++j){
+		Restaurant &restaurant = restaurants[j];
+		vector<Customer> &customers = restaurant.customers;
+		list<shared_ptr<Table>> &tables = restaurant.tables;
+
+		for(auto it=tables.begin(); it!=tables.end(); ++it){
+			shared_ptr<Table> &table = *it;
+			shared_ptr<Topic> &oldTopic = table->topic;
+			m--;
+			oldTopic->m--;
+			// 料理が提供されているテーブルがなくなったらメニューから料理を削除
+			if(oldTopic->m == 0){
+				topics.remove_if([](shared_ptr<Topic> &topic){
+					return topic->m == 0;
+				});
+			}
+			else{	
+				oldTopic->n -= table->n;
+				for(int v=0; v<V; ++v){
+					oldTopic->n_v[v] -= table->n_v[v];
+				}
+			}
+			
+			// 料理ごとの選択確率を求める
+			// ただし、値が非常に小さくなるので対数で計算する
+			int K = topics.size();
+			vector<double> unnormalizedCDF(K + 1);
+			vector<double> logPk(K + 1, 0.0);
+			vector<shared_ptr<Topic>> ptrTopics(K);
+			int k=0;
+			for(auto it2=topics.begin(); it2!=topics.end(); ++it2){
+				shared_ptr<Topic> &topic = *it2;
+				ptrTopics[k] = *it2;
+
+				logPk[k] = log(static_cast<double>(topic->m));
+				for(int i=0; i<table->n; ++i){
+					logPk[k] -= log(topic->n + i + V * beta);
+				}
+				for(int v=0; v<V; ++v){
+					for(int i=0; i<table->n_v[v]; ++i){
+						logPk[k] += log(topic->n_v[v] + i + beta);
+					}
+				}
+
+				++k;
+			}
+			// 新しい料理をサンプリングする確率の対数
+			logPk[K] = log(gamma);
+			for(int i=0; i<table->n; ++i){
+				logPk[K] -= log(i + V * beta);
+			}
+			for(int v=0; v<V; ++v){
+				for(int i=0; i<table->n_v[v]; ++i){
+					logPk[K] += log(i + beta);
+				}
+			}
+			
+			double maxLogP = *(boost::min_element(logPk));
+			unnormalizedCDF[0] = exp(logPk[0] - maxLogP);
+			for(int k=1; k<K+1; ++k){
+				unnormalizedCDF[k] = unnormalizedCDF[k-1] + exp(logPk[k] - maxLogP);
+			}
+
+			// 離散累積分布からテーブル番号をサンプリング
+			double kRnd = uniform() * unnormalizedCDF[K];
+			int kNew = K;
+			for(int k=0; k<K+1; ++k){
+				if(unnormalizedCDF[k] > kRnd){
+					kNew = k;
+					break;
+				}
+			}
+
+			shared_ptr<Topic> newTopic;
+			if(kNew < K){ // 既存のトピックの場合
+				newTopic = ptrTopics[kNew];
+			}
+			else{ // 新しいトピックの場合
+				newTopic = shared_ptr<Topic>(new Topic(V, beta));
+				topics.push_back(newTopic);
+			}
+			newTopic->m++;
+			newTopic->n += table->n;
+			for(int v=0; v<V; ++v){
+				newTopic->n_v[v] += table->n_v[v];
+			}
+			table->topic = newTopic;
+			m++;
+		}
+	}
+}

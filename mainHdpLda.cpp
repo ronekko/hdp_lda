@@ -5,11 +5,11 @@
 #include <string>
 #include <vector>
 #include <utility>
-#include <numeric>
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <boost/range/numeric.hpp>
 #include <boost/timer.hpp>
 #include <boost/random.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -35,8 +35,8 @@ _CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF ); // メモリリーク
 	const int K = 16;
 	const int ITERATION = 300;
 	const int INTERVAL = 50;
-	const double GAMMA = 5.0;
-	const double ALPHA0 = 0.05;
+	const double GAMMA = 1.0;
+	const double ALPHA0 = 0.1;
 	const double BETA = 0.5;
 
 	
@@ -55,9 +55,10 @@ _CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF ); // メモリリーク
 	for(int i=0; i<1000; ++i){
 		cout << "*** " << i << " *******************************************************" << endl;
 		hdp.sampleTables();
+		hdp.sampleTopics();
 		cout << "hdp.m: " << hdp.m << endl;
 		cout << "hdp.topics.size(): " << hdp.topics.size() << endl;	
-		cout << "hdp.topics[0].n: " << accumulate(hdp.topics.begin(), hdp.topics.end(), 0, [](int n, shared_ptr<Topic> t){return n + t->n;}) << endl;
+		cout << "hdp.topics[0].n: " << boost::accumulate(hdp.topics, 0, [](int n, shared_ptr<Topic> t){return n + t->n;}) << endl;
 		cout << endl;
 	}
 	for(int j=0; j<hdp.restaurants.size(); ++j){ cout << "[" << j << "] " << hdp.restaurants[j].tables.size() << endl; }
