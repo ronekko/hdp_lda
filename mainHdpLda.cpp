@@ -23,68 +23,56 @@ using namespace std;
 
 int main(int argc, char** argv)
 {
-_CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF ); // メモリリーク検出用コード
-	boost::timer timer;
-	string dirName;
-	{
-		using namespace boost::posix_time;
-		dirName = to_iso_string(second_clock::local_time());
-	}
-	_mkdir(dirName.c_str());
+	_CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF ); // メモリリーク検出用コード
+
+
+
 
 	const int K = 16;
-	const int ITERATION = 300;
+	const int ITERATION = 500;
 	const int INTERVAL = 50;
-	const double GAMMA = 1.0;
+	const double GAMMA = 0.5;
 	const double ALPHA0 = 0.1;
 	const double BETA = 0.5;
 
-	
-	Corpus corpus("docword.kos\\docword.kos.txt"); // K=15~18あたりが最善
-//	Corpus corpus("docword.kos\\docword.smallkos.txt"); // K=15~18あたりが最善
-//	Corpus corpus("docword.kos\\docword.minimalkos.txt"); // K=15~18あたりが最善
-	Vocabulary vocabulary("docword.kos\\vocab.kos.txt", K);
-//	Corpus corpus("docword.nips\\docword.nips.txt"); // K=50近辺が最善
-//	Vocabulary vocabulary("docword.nips\\vocab.nips.txt", K);
-//	Corpus corpus("C:\\Documents and Settings\\sakurai\\My Documents\\Dataset\\Clothing2\\corpus.txt"); // K=15~18あたりが最善
+	const string corpusName = "kos";	// K=15~18あたりが最善
+//	const string corpusName = "smallkos";
+//	const string corpusName = "minimalkos";
+//	const string corpusName = "nips";	// K=50近辺が最善
+
+	Corpus corpus("docword." + corpusName + "\\docword." + corpusName + ".txt"); 
+	Vocabulary vocabulary("docword." + corpusName + "\\vocab." + corpusName + ".txt", K);
+//	Corpus corpus("C:\\Documents and Settings\\sakurai\\My Documents\\Dataset\\Clothing2\\corpus.txt");
 //	Vocabulary vocabulary("C:\\Documents and Settings\\sakurai\\My Documents\\Dataset\\Clothing2\\vocab.txt", K);
 
-//	HdpLda hdp(corpus, vocabulary, static_cast<unsigned long>(time(0)), GAMMA, ALPHA0, BETA, K);
-	HdpLda hdp(corpus, vocabulary, static_cast<unsigned long>(0), GAMMA, ALPHA0, BETA, K);
-
-	for(int i=0; i<1000; ++i){
-		cout << "*** " << i << " *******************************************************" << endl;
-		hdp.sampleTables();
-		hdp.sampleTopics();
-		cout << "hdp.m: " << hdp.m << endl;
-		cout << "hdp.topics.size(): " << hdp.topics.size() << endl;	
-		cout << "hdp.topics[0].n: " << boost::accumulate(hdp.topics, 0, [](int n, shared_ptr<Topic> t){return n + t->n;}) << endl;
-		cout << "Perplexity: " << hdp.calcPerplexity() << endl;
-		cout << endl;
-	}
-//	for(int j=0; j<hdp.restaurants.size(); ++j){ cout << "[" << j << "] " << hdp.restaurants[j].tables.size() << endl; }
-
-/*//	cout << "\n############### K = " << K << " : ROUND " << round << " ###################" << endl;
 	HdpLda hdp(corpus, vocabulary, static_cast<unsigned long>(time(0)), GAMMA, ALPHA0, BETA, K);
+//	HdpLda hdp(corpus, vocabulary, static_cast<unsigned long>(0), GAMMA, ALPHA0, BETA, K);
 
-	stringstream ss;
-	ss << dirName << "\\K=" << K << "_" << round << ", ITER=" << ITERATION << " alpha=" << alpha << " beta=" << beta << ".txt";
-	ofstream ofs(ss.str().c_str());
 
+	// いちばん良かった結果の保存用
 	double bestPerplexity=DBL_MAX;
 	vector<vector<double>> bestPhi;
 	vector<vector<double>> bestTheta;
 
-	for(int i=0; i<ITERATION; ++i){
-		timer.restart();
-//		lda.update();
-		cout << "time: " << timer.elapsed() << endl;
-//		lda.showAllCounts();
+	// 保存ファイル名
+	string dirName;
+	using namespace boost::posix_time;
+	dirName = to_iso_string(second_clock::local_time()) + " " + corpusName;
+	_mkdir(dirName.c_str());
+	stringstream ss;
+	ss << dirName << "\\Perplexity, γ=" << GAMMA << ", α0=" << ALPHA0 << ", β" << BETA << ", ITER=" << ITERATION << ".txt";
+	ofstream ofs(ss.str().c_str());
 
-		vector<vector<double> > phi = lda.calcPhi();
-		vector<vector<double> > theta = lda.calcTheta();
-		double perplexity = lda.calcPerplexity(phi, theta);
-		cout << "iteration " << i << "\t- perplexity: " << perplexity << endl;
+	for(int i=0; i<ITERATION; ++i){
+		cout << "*** " << i << " *******************************************************" << endl;
+		
+		boost::timer timer;
+		hdp.sampling();
+		cout << "time: " << timer.elapsed() << endl;
+
+		vector<vector<double> > phi = hdp.calcPhi();
+		vector<vector<double> > theta = hdp.calcTheta();
+		double perplexity = hdp.calcPerplexity(phi, theta);
 		ofs << perplexity << endl;
 
 		if(perplexity < bestPerplexity){
@@ -92,22 +80,20 @@ _CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF ); // メモリリーク
 			bestPhi = phi;
 			bestTheta = theta;
 		}
-		//if(i%INTERVAL == 0){
-		//	cout << "\niteration: " << i << endl;
-		//	stringstream ss;
-		//	ss << dirName << "\\" << i << ".txt";
-		//	lda.saveCurrentModel(ss.str());
-		//}
-		//cout << "*";
+
+		cout << "hdp.m: " << hdp.m << endl;
+		cout << "hdp.topics.size(): " << hdp.topics.size() << endl;	
+		cout << "hdp.topics[0].n: " << boost::accumulate(hdp.topics, 0, [](int n, shared_ptr<Topic> t){return n + t->n;}) << endl;	
+		cout << "Perplexity: " << perplexity << endl;
+		cout << endl;
 	}
 	ofs.close();
 
 	stringstream ssp;
-	ssp << dirName << "\\phi, K=" << K << "_" << round << ", ITER=" << ITERATION << " PERPLEXITY=" << bestPerplexity << " alpha=" << alpha << " beta=" << beta << ".txt";
+	ssp << dirName << "\\phi, γ=" << GAMMA << ", α0=" << ALPHA0 << ", β" << BETA << ", ITER=" << ITERATION << "PERPLEXITY=" << bestPerplexity << ".txt";
 	stringstream sst;
-	sst << dirName << "\\theta, K=" << K << "_" << round << ", ITER=" << ITERATION << " PERPLEXITY=" << bestPerplexity << " alpha=" << alpha << " beta=" << beta << ".txt";
-//	lda.savePhiTheta(bestPhi, ssp.str(), bestTheta, sst.str());
-*/
+	sst << dirName << "\\theta, γ=" << GAMMA << ", α0=" << ALPHA0 << ", β" << BETA << ", ITER=" << ITERATION << "PERPLEXITY=" << bestPerplexity << ".txt";
+	hdp.savePhiTheta(bestPhi, ssp.str(), bestTheta, sst.str());
 
 	return 0;
 }

@@ -1,4 +1,6 @@
 #include <cmath>
+#include <fstream>
+#include <utility>
 #include <boost/random.hpp>
 #include <boost/range/algorithm.hpp>
 #include <boost/range/numeric.hpp>
@@ -45,7 +47,16 @@ HdpLda::HdpLda(const Corpus &corpus, const Vocabulary &vocabulary, const unsigne
 
 
 
-void HdpLda::sampleTables()
+void HdpLda::sampling(void)
+{
+	sampleTables();
+	sampleTopics();
+	K = topics.size();
+}
+
+
+
+void HdpLda::sampleTables(void)
 {
 	using namespace boost;
 	using std::shared_ptr;
@@ -175,7 +186,7 @@ void HdpLda::sampleTables()
 
 
 
-void HdpLda::sampleTopics()
+void HdpLda::sampleTopics(void)
 {
 	using namespace boost;
 	using std::shared_ptr;
@@ -275,41 +286,14 @@ void HdpLda::sampleTopics()
 	}
 }
 
-double HdpLda::calcPerplexity(void)
+
+
+double HdpLda::calcPerplexity(const vector<vector<double>> &phi, const vector<vector<double>> &theta)
 {
 	double perplexity = 0.0;
-	const int K = topics.size();
-	vector<vector<double>> phi(K);
-	vector<vector<double>> theta(D);
+	const int K = phi.size();
 
-	boost::for_each(phi, [&](vector<double> &phi_k){phi_k.resize(V, 0.0);});
-	boost::for_each(theta, [&](vector<double> &theta_j){theta_j.resize(K, 0.0);});
-
-	vector<shared_ptr<Topic>> ptrTopics(K);
-	boost::copy(topics, ptrTopics.begin());
-
-	// É≥ÇãÅÇﬂÇÈ
-	for(int k=0; k<K; ++k){
-		shared_ptr<Topic> &topic = ptrTopics[k];
-		for(int v=0; v<V; ++v){
-			phi[k][v] = (topic->n_v[v] + beta) / (topic->n + V * beta);
-		}
-	}
-	
 	for(int j=0; j<D; ++j){
-		const int T = restaurants[j].tables.size();
-		vector<shared_ptr<Table>> tables(T);		
-		boost::copy(restaurants[j].tables, tables.begin());
-		
-		for(int t=0; t<T; ++t){
-			int k = distance(ptrTopics.begin(), boost::find(ptrTopics, tables[t]->topic));
-			theta[j][k] += tables[t]->n;
-		}
-		for(int k=0; k<K; ++k){
-			theta[j][k] += alpha0 * (ptrTopics[k]->m + gamma / static_cast<double>(K)) / (m + gamma);
-			theta[j][k] /= (restaurants[j].n + alpha0);
-		}
-
 		vector<Customer> &customers = restaurants[j].customers;
 		for(int i=0; i<customers.size(); ++i){
 			int v = customers[i].word;
@@ -324,4 +308,115 @@ double HdpLda::calcPerplexity(void)
 	perplexity = exp(perplexity / static_cast<double>(N));
 
 	return perplexity;
+}
+
+
+
+vector<vector<double>> HdpLda::calcPhi(void)
+{
+	
+	const int K = topics.size();
+	vector<vector<double>> phi(K);
+
+	boost::for_each(phi, [&](vector<double> &phi_k){phi_k.resize(V, 0.0);});
+
+	vector<shared_ptr<Topic>> ptrTopics(K);
+	boost::copy(topics, ptrTopics.begin());
+
+	// É≥ÇãÅÇﬂÇÈ
+	for(int k=0; k<K; ++k){
+		shared_ptr<Topic> &topic = ptrTopics[k];
+		for(int v=0; v<V; ++v){
+			phi[k][v] = (topic->n_v[v] + beta) / (topic->n + V * beta);
+		}
+	}
+
+	return phi;
+}
+
+
+
+vector<vector<double>> HdpLda::calcTheta(void)
+{
+	double perplexity = 0.0;
+	const int K = topics.size();
+	vector<vector<double>> theta(D);
+	boost::for_each(theta, [&](vector<double> &theta_j){theta_j.resize(K, 0.0);});
+
+	vector<shared_ptr<Topic>> ptrTopics(K);
+	boost::copy(topics, ptrTopics.begin());
+
+	for(int j=0; j<D; ++j){
+		const int T = restaurants[j].tables.size();
+		vector<shared_ptr<Table>> tables(T);		
+		boost::copy(restaurants[j].tables, tables.begin());
+		
+		for(int t=0; t<T; ++t){
+			int k = distance(ptrTopics.begin(), boost::find(ptrTopics, tables[t]->topic));
+			theta[j][k] += tables[t]->n;
+		}
+		for(int k=0; k<K; ++k){
+			theta[j][k] += alpha0 * (ptrTopics[k]->m + gamma / static_cast<double>(K)) / (m + gamma);
+			theta[j][k] /= (restaurants[j].n + alpha0);
+		}
+	}
+
+	return theta;
+}
+
+
+
+void HdpLda::savePhi(const vector<vector<double>> &phi, const string &fileName)
+{	
+	ofstream ofs(fileName.c_str());
+	for(int k=0; k<K; ++k){
+		ofs << "Topic: " << k << endl;
+		vector<pair<double, string>> phi_k;
+		phi_k.resize(V);
+		for(int v=0; v<V; ++v){
+			phi_k[v].first = phi[k][v];
+			phi_k[v].second = vocabulary.words[v].str;
+		}
+
+		boost::sort(phi_k, greater<pair<double, string>>());
+			
+		for(int v=0; v<20; ++v){
+			ofs << "\t" << phi_k[v].second << ": " << phi_k[v].first << endl;
+		}
+		ofs << "\n" << endl;
+	}
+	ofs.close();
+}
+
+
+
+void HdpLda::saveTheta(const vector<vector<double>> &theta, const string &fileName)
+{
+	ofstream ofs(fileName.c_str());
+	for(int j=0; j<D; ++j){
+		ofs << "Document: " << j << endl;
+		vector<pair<double, int>> theta_j;
+		theta_j.resize(K);
+		for(int k=0; k<K; ++k){
+			theta_j[k].first = theta[j][k];
+			theta_j[k].second = k;
+		}
+
+		boost::sort(theta_j, greater<pair<double, int>>());
+			
+		for(int k=0; k<K; ++k){
+			ofs << "\t" << theta_j[k].second << ": " << theta_j[k].first << endl;
+		}
+		ofs << "\n" << endl;
+	}
+	ofs.close();
+}
+
+
+
+void HdpLda::savePhiTheta(const vector<vector<double>> &phi, const string &phiFileName,
+					const vector<vector<double>> &theta, const string &thetaFileName)
+{
+	savePhi(phi, phiFileName);
+	saveTheta(theta, thetaFileName);
 }

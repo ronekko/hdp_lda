@@ -100,11 +100,16 @@ public:
 	~HdpLda(void){};
 	HdpLda(const Corpus &corpus, const Vocabulary &vocabulary, const unsigned long seed
 		  , const double &gamma, const double &alpha0, const double &beta, const int &K = 3);
+	void sampling();
 	void sampleTables();
 	void sampleTopics();
-	vector<vector<double>> calcPhi(void);
-	vector<vector<double>> calcTheta(void);
-	double calcPerplexity(void);
+	vector<vector<double>> calcPhi(void);	// Φ[k][v], トピックkの単語比率V次元多項分布
+	vector<vector<double>> calcTheta(void);	// Θ[j][k], 文書jのトピック比率K次元多項分布
+	double calcPerplexity(const vector<vector<double>> &phi, const vector<vector<double>> &theta);
+	void savePhi(const vector<vector<double>> &phi, const string &fileName);
+	void saveTheta(const vector<vector<double>> &theta, const string &fileName);
+	void savePhiTheta(const vector<vector<double>> &phi, const string &phiFileName,
+					const vector<vector<double>> &theta, const string &thetaFileName);
 
 	Corpus corpus;
 	Vocabulary vocabulary;
@@ -116,16 +121,9 @@ public:
 	int V;
 	int N;
 	int K;
-	std::list<int> m_k; // コーパス全体で料理kを食べている人数のカウント
-	std::vector<std::list<int>> n_jt; // 文書jのテーブルtに座っている人数のカウント
-	std::vector<std::list<std::vector<int>>> n_jtk; // 文書jのテーブルtに座っている人が語彙vであるカウント
-	std::list<std::vector<int>> phi_kw; // コーパス全体で料理kを食べている人が語彙wであるカウント
-	std::vector<std::list<int>> psi_jt; // 文書jのテーブルtに乗っている料理k
-
-	
 	std::vector<Restaurant> restaurants;
 	std::list<std::shared_ptr<Topic>> topics;
-	int m;
+	int m; // 全店のテーブル数の合計
 };
 
 
