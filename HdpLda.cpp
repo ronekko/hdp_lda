@@ -10,12 +10,13 @@
 #include <omp.h>
 
 
-
+using namespace hdplda;
 
 HdpLda::HdpLda(const Corpus &corpus, const Vocabulary &vocabulary, const unsigned long seed
-			 , const double &gamma, const double &alpha0, const double &beta, const int &K)
+			 , const double &gamma, const double &alpha0, const double &beta
+			 , const double &gamma_a, const double &gamma_b, const double &alpha0_a, const double &alpha0_b, const int &K)
 			 : corpus(corpus), vocabulary(vocabulary), gamma(gamma), alpha0(alpha0), beta(beta)
-			 , D(corpus.D), V(corpus.V), N(corpus.N), K(K)
+			 , D(corpus.D), V(corpus.V), N(corpus.N), K(K), gamma_a(gamma_a), gamma_b(gamma_b), alpha0_a(alpha0_a), alpha0_b(alpha0_b)
 {
 	m = 0;
 	engine.seed(seed);
@@ -250,7 +251,7 @@ void HdpLda::sampleTopics(void)
 			vector<shared_ptr<Topic>> ptrTopics(K);
 			boost::copy(topics, ptrTopics.begin());
 
-//#pragma omp for
+#pragma omp for
 			for(int k=0; k<K; ++k){
 				shared_ptr<Topic> &topic = ptrTopics[k];
 
@@ -319,7 +320,7 @@ void HdpLda::sampleTopics(void)
 		}
 		tm += timer.elapsed();
 	}
-	cout << "\ttm="<<tm<<endl;
+//	cout << "\ttm="<<tm<<endl;
 }
 
 
@@ -457,4 +458,64 @@ void HdpLda::savePhiTheta(const vector<vector<double>> &phi, const string &phiFi
 {
 	savePhi(phi, phiFileName);
 	saveTheta(theta, thetaFileName);
+}
+
+void HdpLda::showAllCounts(void)
+{
+	cout << "hdp.m: " << m << endl;
+	cout << "hdp.topics.size(): " << topics.size() << endl;	
+	cout << "hdp.topics[0].n: " << boost::accumulate(topics, 0, [](int n, shared_ptr<Topic> t){return n + t->n;}) << endl;	
+}
+
+void HdpLda::showAllParameters(void)
+{
+	cout << "gamma: " << gamma << ", alpha_0: " << alpha0 << ", beta: " << beta << endl;
+}
+
+
+double HdpLda::betaRandom(const double &alpha, const double &beta)
+{
+	double x = boost::gamma_distribution<>(alpha, 1.0)(engine);
+	double y = boost::gamma_distribution<>(beta, 1.0)(engine);
+	return x / (x + y);
+}
+
+// Escobar and West, "Bayesian Density Estimation and Inference Using Mixtures"
+void HdpLda::sampleGamma(void)
+{
+	using namespace boost;
+
+	double eta = betaRandom(gamma + 1.0, m); // 式(14)
+	int k = topics.size();
+	double p_pi = gamma_a + k - 1;
+	p_pi = p_pi / (m * (1.0/gamma_b - log(eta)) + p_pi);
+
+	bool pi = bernoulli_distribution<>(p_pi)(engine);
+	double shape = pi ? (gamma_a + k) : (gamma_a + k - 1);
+	double scale = 1.0 / (1.0/gamma_b - log(eta));
+	gamma = gamma_distribution<>(shape, scale)(engine); // 式(13)
+}
+
+		
+
+void HdpLda::sampleAlpha0(const int &iter)
+{
+	using namespace boost;
+
+	double sum_log_w;
+	double sum_s;
+
+	for(int i=0; i<iter; ++i){
+		cout << "\t" << alpha0 << endl;
+		sum_log_w = 0.0;
+		sum_s = 0.0;
+		for(int j=0; j<D; ++j){
+			const int &n_j = restaurants[j].n;
+			sum_log_w += log(betaRandom(alpha0 + 1, n_j));
+			sum_s += bernoulli_distribution<>(static_cast<double>(n_j) / (alpha0 + n_j))(engine); // bernoulli(n/α_0 + n)からサンプリング
+		}
+		double shape = alpha0_a + m - sum_s;
+		double scale = 1.0 / ((1.0 / alpha0_b) - sum_log_w); // bはrateパラメータ
+		alpha0 = gamma_distribution<>(shape, scale)(engine);
+	}
 }

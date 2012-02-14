@@ -45,8 +45,8 @@ int main(int argc, char** argv)
 //	Corpus corpus("C:\\Documents and Settings\\sakurai\\My Documents\\Dataset\\Clothing2\\corpus.txt");
 //	Vocabulary vocabulary("C:\\Documents and Settings\\sakurai\\My Documents\\Dataset\\Clothing2\\vocab.txt", K);
 
-//	HdpLda hdp(corpus, vocabulary, static_cast<unsigned long>(time(0)), GAMMA, ALPHA0, BETA, K);
-	HdpLda hdp(corpus, vocabulary, static_cast<unsigned long>(0), GAMMA, ALPHA0, BETA, K);
+//	hdplda::HdpLda hdp(corpus, vocabulary, static_cast<unsigned long>(time(0)), GAMMA, ALPHA0, BETA, K);
+	hdplda::HdpLda hdp(corpus, vocabulary, static_cast<unsigned long>(0), GAMMA, ALPHA0, BETA, K);
 
 
 	// ‚¢‚¿‚Î‚ñ—Ç‚©‚Á‚½Œ‹‰Ê‚Ì•Û‘¶—p
@@ -63,11 +63,15 @@ int main(int argc, char** argv)
 	ss << dirName << "\\Perplexity, ƒÁ=" << GAMMA << ", ƒ¿0=" << ALPHA0 << ", ƒÀ" << BETA << ", ITER=" << ITERATION << ".txt";
 	ofstream ofs(ss.str().c_str());
 
+	hdp.showAllParameters();
+
 	for(int i=0; i<ITERATION; ++i){
 		cout << "*** " << i << " *******************************************************" << endl;
 		
 		boost::timer timer;
 		hdp.sampling();
+		if((i % 20) == 19){ hdp.sampleGamma(); }
+		if((i % 100) == 99){ hdp.sampleAlpha0(20); }
 		cout << "time: " << timer.elapsed() << endl;
 
 		vector<vector<double> > phi = hdp.calcPhi();
@@ -81,9 +85,8 @@ int main(int argc, char** argv)
 			bestTheta = theta;
 		}
 
-		cout << "hdp.m: " << hdp.m << endl;
-		cout << "hdp.topics.size(): " << hdp.topics.size() << endl;	
-		cout << "hdp.topics[0].n: " << boost::accumulate(hdp.topics, 0, [](int n, shared_ptr<Topic> t){return n + t->n;}) << endl;	
+		hdp.showAllCounts();
+		hdp.showAllParameters();
 		cout << "Perplexity: " << perplexity << endl;
 		cout << endl;
 	}
