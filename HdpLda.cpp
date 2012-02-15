@@ -13,8 +13,8 @@
 using namespace hdplda;
 
 HdpLda::HdpLda(const Corpus &corpus, const Vocabulary &vocabulary, const unsigned long seed
-			 , const double &gamma, const double &alpha0, const double &beta
-			 , const double &gamma_a, const double &gamma_b, const double &alpha0_a, const double &alpha0_b, const int &K)
+			 , const double &gamma, const double &alpha0, const double &beta, const int &K
+			 , const double &gamma_a, const double &gamma_b, const double &alpha0_a, const double &alpha0_b)
 			 : corpus(corpus), vocabulary(vocabulary), gamma(gamma), alpha0(alpha0), beta(beta)
 			 , D(corpus.D), V(corpus.V), N(corpus.N), K(K), gamma_a(gamma_a), gamma_b(gamma_b), alpha0_a(alpha0_a), alpha0_b(alpha0_b)
 {
@@ -53,8 +53,12 @@ HdpLda::HdpLda(const Corpus &corpus, const Vocabulary &vocabulary, const unsigne
 
 void HdpLda::sampling(void)
 {
+	boost::timer t;
 	sampleTables();
+	cout << "\tsampleTables() " << t.elapsed() << endl;
+	t.restart();
 	sampleTopics();
+	cout << "\tsampleTopics() " << t.elapsed() << endl;
 	K = topics.size();
 }
 
@@ -488,11 +492,11 @@ void HdpLda::sampleGamma(void)
 	double eta = betaRandom(gamma + 1.0, m); // 式(14)
 	int k = topics.size();
 	double p_pi = gamma_a + k - 1;
-	p_pi = p_pi / (m * (1.0/gamma_b - log(eta)) + p_pi);
+	p_pi = p_pi / (m * (gamma_b - log(eta)) + p_pi);
 
 	bool pi = bernoulli_distribution<>(p_pi)(engine);
 	double shape = pi ? (gamma_a + k) : (gamma_a + k - 1);
-	double scale = 1.0 / (1.0/gamma_b - log(eta));
+	double scale = 1.0 / (gamma_b - log(eta));
 	gamma = gamma_distribution<>(shape, scale)(engine); // 式(13)
 }
 
@@ -506,7 +510,6 @@ void HdpLda::sampleAlpha0(const int &iter)
 	double sum_s;
 
 	for(int i=0; i<iter; ++i){
-		cout << "\t" << alpha0 << endl;
 		sum_log_w = 0.0;
 		sum_s = 0.0;
 		for(int j=0; j<D; ++j){
@@ -515,7 +518,33 @@ void HdpLda::sampleAlpha0(const int &iter)
 			sum_s += bernoulli_distribution<>(static_cast<double>(n_j) / (alpha0 + n_j))(engine); // bernoulli(n/α_0 + n)からサンプリング
 		}
 		double shape = alpha0_a + m - sum_s;
-		double scale = 1.0 / ((1.0 / alpha0_b) - sum_log_w); // bはrateパラメータ
+		double scale = 1.0 / (alpha0_b - sum_log_w); // bはrateパラメータ
 		alpha0 = gamma_distribution<>(shape, scale)(engine);
 	}
+}
+
+
+
+vector<double> HdpLda::calcSticksOfG0(void){
+	const int K = topics.size();
+	vector<double> stickLengths(K+1);
+	boost::transform(topics, stickLengths.begin(), [](shared_ptr<Topic> topic){
+		return topic->n;
+	});
+	stickLengths[K] = gamma;
+	double total = boost::accumulate(stickLengths, 0.0);
+	boost::for_each(stickLengths, [total](double &len){ len /= total;});
+
+	return stickLengths;
+}
+
+vector<double> HdpLda::calcEntropyOfTopics(const vector<vector<double>> &phi)
+{
+	const int K = phi.size();
+	vector<double> entropy_k(K);
+	for(int k=0; k<K; ++k){
+		entropy_k[k] = boost::accumulate(phi[k], 0.0, [](double sum, double p_v){ return sum -= (p_v * log(p_v));});
+	}
+
+	return entropy_k;
 }

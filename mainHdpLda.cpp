@@ -8,17 +8,59 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <algorithm>
+#include <boost/range/algorithm.hpp>
 #include <boost/range/numeric.hpp>
 #include <boost/timer.hpp>
 #include <boost/random.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <opencv2/opencv.hpp>
 #include "direct.h"
 
 #include "HdpLda.h"
 #include "Corpus.hpp"
 
+#ifdef _DEBUG
+	#pragma comment(lib, "opencv_core231d.lib")
+	#pragma comment(lib, "opencv_imgproc231d.lib")
+	#pragma comment(lib, "opencv_highgui231d.lib")
+	#pragma comment(lib, "opencv_features2d231d.lib")
+#else
+	#pragma comment(lib, "opencv_core231.lib")
+	#pragma comment(lib, "opencv_imgproc231.lib")
+	#pragma comment(lib, "opencv_highgui231.lib")
+	#pragma comment(lib, "opencv_features2d231.lib")
+#endif
+
 using namespace std;
+
+
+void showSticks2(const string &title, const vector<double> &stickLengths)
+{
+	using namespace cv;
+	int h = 30;
+	int w = 700;
+	int K = stickLengths.size();
+
+	vector<double> stickProportions(K);
+	double totalStickLength = boost::accumulate(stickLengths, 0.0, [](double sum, double length){ return sum += length;});
+	boost::transform(stickLengths, stickProportions.begin(), [totalStickLength](double length){ return length / totalStickLength;});
+
+	Mat image = Mat::zeros(h, w, CV_8UC1);
+	vector<int> breakingPoints(K);
+	double sum = 0.0;
+	for(int k=0; k<K; ++k){
+		sum += stickProportions[k];
+		breakingPoints[k] = sum * w;
+	}
+	int currentPoint = 0;
+	for(int k=0; k<K; ++k){
+		rectangle(image, Point(currentPoint, 0), Point(breakingPoints[k], h), Scalar((k%3)*128-1), CV_FILLED);
+		currentPoint = breakingPoints[k];
+	}
+	imshow(title, image);
+	waitKey(1);
+
+}
 
 
 int main(int argc, char** argv)
@@ -29,10 +71,10 @@ int main(int argc, char** argv)
 
 
 	const int K = 16;
-	const int ITERATION = 500;
+	const int ITERATION = 2000;
 	const int INTERVAL = 50;
 	const double GAMMA = 0.1;
-	const double ALPHA0 = 0.5;
+	const double ALPHA0 = 35;
 	const double BETA = 0.5;
 
 	const string corpusName = "kos";	// K=15~18あたりが最善
@@ -71,7 +113,7 @@ int main(int argc, char** argv)
 		boost::timer timer;
 		hdp.sampling();
 		if((i % 20) == 19){ hdp.sampleGamma(); }
-		if((i % 100) == 99){ hdp.sampleAlpha0(20); }
+		if((i % 30) == 29){ hdp.sampleAlpha0(20); }
 		cout << "time: " << timer.elapsed() << endl;
 
 		vector<vector<double> > phi = hdp.calcPhi();
@@ -89,6 +131,24 @@ int main(int argc, char** argv)
 		hdp.showAllParameters();
 		cout << "Perplexity: " << perplexity << endl;
 		cout << endl;
+
+		// スティックの表示
+		vector<double> stickLengths = hdp.calcSticksOfG0();
+		vector<double> entropy_k = hdp.calcEntropyOfTopics(phi);
+		if((i % 30) == 0){
+			for(int k=0; k<entropy_k.size(); ++k){
+				cout << k << ": " << entropy_k[k] << endl;
+			}
+		}
+		cout << boost::format("%s %s") % stickLengths.size() % entropy_k.size() << endl;;
+		vector<double> weightedStickLengths(entropy_k.size());
+		boost::transform(entropy_k, stickLengths, weightedStickLengths.begin(), [](double entropy, double length){
+			return length / exp(entropy);
+		});		
+		showSticks2("Entropy", entropy_k);
+		showSticks2("stick length", stickLengths);
+		showSticks2("weightedStickLengths", weightedStickLengths);
+
 	}
 	ofs.close();
 

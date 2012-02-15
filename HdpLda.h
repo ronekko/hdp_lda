@@ -91,9 +91,9 @@ namespace hdplda{
 		HdpLda(void){};
 		~HdpLda(void){};
 		HdpLda(const Corpus &corpus, const Vocabulary &vocabulary, const unsigned long seed
-			  , const double &gamma, const double &alpha0, const double &beta
-			  , const double &gamma_a = 0.01, const double &gamma_b = 0.1
-			  , const double &alpha0_a = 10.0, const double &alpha0_b = 1.0, const int &K = 3);
+			  , const double &gamma, const double &alpha0, const double &beta, const int &K = 3
+			  , const double &gamma_a = 0.01, const double &gamma_b = 1.0
+			  , const double &alpha0_a = 30.0, const double &alpha0_b = 0.1);
 		void sampling();
 		void sampleTables();
 		void sampleTopics();
@@ -102,6 +102,8 @@ namespace hdplda{
 		double betaRandom(const double &alpha, const double &beta);
 		vector<vector<double>> calcPhi(void);	// Φ[k][v], トピックkの単語比率V次元多項分布
 		vector<vector<double>> calcTheta(void);	// Θ[j][k], 文書jのトピック比率K次元多項分布
+		vector<double> calcSticksOfG0(void);	// G0の各コンポーネントのスティックの長さを求める
+		vector<double> calcEntropyOfTopics(const vector<vector<double>> &phi);
 		double calcPerplexity(const vector<vector<double>> &phi, const vector<vector<double>> &theta);
 		void savePhi(const vector<vector<double>> &phi, const string &fileName);
 		void saveTheta(const vector<vector<double>> &theta, const string &fileName);
