@@ -2,6 +2,7 @@
 #include <fstream>
 #include <utility>
 #include <unordered_map>
+#include <boost/math/special_functions/gamma.hpp>
 #include <boost/random.hpp>
 #include <boost/range/algorithm.hpp>
 #include <boost/range/numeric.hpp>
@@ -53,12 +54,8 @@ HdpLda::HdpLda(const Corpus &corpus, const Vocabulary &vocabulary, const unsigne
 
 void HdpLda::sampling(void)
 {
-	boost::timer t;
 	sampleTables();
-	cout << "\tsampleTables() " << t.elapsed() << endl;
-	t.restart();
 	sampleTopics();
-	cout << "\tsampleTopics() " << t.elapsed() << endl;
 	K = topics.size();
 }
 
@@ -192,16 +189,31 @@ void HdpLda::sampleTables(void)
 	}
 }
 
-
-inline double HdpLda::calcLogNPlusBeta(int n)
+// log(gamma(x + n) / gamma(x)) == log(x * (x+1) * (x+2) * ... * (x+n-1))
+inline double HdpLda::logRisingFactorial(const double &x, const double &n)
 {
-	return (cacheLogNPlusBeta.find(n) != cacheLogNPlusBeta.end()) ? cacheLogNPlusBeta[n]
-																  : (cacheLogNPlusBeta[n] = log(n + beta));
-}
-inline double HdpLda::calcLogNPlusVBeta(int n)
-{
-	return (cacheLogNPlusVBeta.find(n) != cacheLogNPlusVBeta.end()) ? cacheLogNPlusVBeta[n]
-																	: (cacheLogNPlusVBeta[n] = log(n + V * beta));
+	using namespace boost::math;
+	
+	if(n > 13){ // nが約13より大きいときはlgammaを使ったほうが速い
+		if(x < 1.0e+15){
+			return lgamma(x + n) - lgamma(x);
+		}
+	}
+	else{ // 上昇階乗を直接計算したもののlog（最速）
+		if(x < 1.0e+22){
+			double total = 1.0;
+			for(int i=0; i<n; ++i){
+				total *= (x + i);
+			}
+			return log(total);
+		}
+	}
+	// (n>13 && x>=1.0e+15) or (n<=13 && x>=1.0e+22)のときはlogの和（遅い）
+	double total = 0.0;
+	for(int i=0; i<n; ++i){
+		total += log(x + i);
+	}
+	return total;
 }
 
 void HdpLda::sampleTopics(void)
@@ -260,32 +272,16 @@ void HdpLda::sampleTopics(void)
 				shared_ptr<Topic> &topic = ptrTopics[k];
 
 				logPk[k] = log(static_cast<double>(topic->m));
-				for(int i=0; i<table->n; ++i){
-					logPk[k] -= log(topic->n + i + V * beta);
-					//↑のようにlogを毎回計算するのは重いのでキャッシュしたものを使う
-					//logPk[k] -= calcLogNPlusVBeta(topic->n + i);
-				}
-
+				logPk[k] -= logRisingFactorial(topic->n + V * beta, table->n);
 				for(int l=0; l<n_v.size(); ++l){
-					for(int i=0; i<n_v[l].second; ++i){
-						logPk[k] += log(topic->n_v[n_v[l].first] + i + beta);
-						//↑のようにlogを毎回計算するのは重いのでキャッシュしたものを使う
-						//logPk[k] += calcLogNPlusBeta(topic->n_v[n_v[l].first] + i); 
-					}
+					logPk[k] += logRisingFactorial(topic->n_v[n_v[l].first] + beta, n_v[l].second); 
 				}
 			}
 			// 新しい料理をサンプリングする確率の対数
 			logPk[K] = log(gamma);
-			for(int i=0; i<table->n; ++i){
-				logPk[K] -= log(i + V * beta);
-				//logPk[K] -= calcLogNPlusVBeta(i);;
-			}
+			logPk[K] -= logRisingFactorial(V * beta, table->n);
 			for(int l=0; l<n_v.size(); ++l){
-				for(int i=0; i<n_v[l].second; ++i){
-					logPk[K] += log(i + beta);
-					//↑のようにlogを毎回計算するのは重いのでキャッシュしたものを使う
-					//logPk[K] += calcLogNPlusBeta(i);
-				}
+				logPk[K] += logRisingFactorial(beta, n_v[l].second);
 			}
 			
 			double maxLogP = *(boost::min_element(logPk));
@@ -492,7 +488,7 @@ void HdpLda::sampleGamma(void)
 	double eta = betaRandom(gamma + 1.0, m); // 式(14)
 	int k = topics.size();
 	double p_pi = gamma_a + k - 1;
-	p_pi = p_pi / (m * (gamma_b - log(eta)) + p_pi);
+	p_pi = p_pi / (p_pi + m * (gamma_b - log(eta)));
 
 	bool pi = bernoulli_distribution<>(p_pi)(engine);
 	double shape = pi ? (gamma_a + k) : (gamma_a + k - 1);

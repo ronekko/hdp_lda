@@ -92,14 +92,15 @@ namespace hdplda{
 		~HdpLda(void){};
 		HdpLda(const Corpus &corpus, const Vocabulary &vocabulary, const unsigned long seed
 			  , const double &gamma, const double &alpha0, const double &beta, const int &K = 3
-			  , const double &gamma_a = 0.01, const double &gamma_b = 1.0
-			  , const double &alpha0_a = 30.0, const double &alpha0_b = 0.1);
+			  , const double &gamma_a = 1.0, const double &gamma_b = 1.0
+			  , const double &alpha0_a = 1000.0, const double &alpha0_b = 100.1);
 		void sampling();
 		void sampleTables();
 		void sampleTopics();
 		void sampleGamma(void);
 		void sampleAlpha0(const int &iter = 20);
 		double betaRandom(const double &alpha, const double &beta);
+		inline double logRisingFactorial(const double &x, const double &n);
 		vector<vector<double>> calcPhi(void);	// Φ[k][v], トピックkの単語比率V次元多項分布
 		vector<vector<double>> calcTheta(void);	// Θ[j][k], 文書jのトピック比率K次元多項分布
 		vector<double> calcSticksOfG0(void);	// G0の各コンポーネントのスティックの長さを求める
@@ -109,8 +110,6 @@ namespace hdplda{
 		void saveTheta(const vector<vector<double>> &theta, const string &fileName);
 		void savePhiTheta(const vector<vector<double>> &phi, const string &phiFileName,
 						const vector<vector<double>> &theta, const string &thetaFileName);
-		inline double calcLogNPlusBeta(int n);
-		inline double calcLogNPlusVBeta(int n);
 		void showAllCounts(void);
 		void showAllParameters(void);
 
@@ -125,14 +124,14 @@ namespace hdplda{
 		int V;
 		int N;
 		int K;
+		// E[γ] = gamma_a / gamma_b, Var[γ] = gamma_a / gamma_b^2
 		double gamma_a; // γの事前分布であるガンマ分布のshapeパラメータ(k)
 		double gamma_b; // γの事前分布であるガンマ分布のrateパラメータ(1/θ)
+		// E[α] = alpha0_a / alpha0_b, Var[α] = alpha0_a / alpha0_b^2
 		double alpha0_a; // α_0の事前分布であるガンマ分布のshapeパラメータ(k)
 		double alpha0_b; // α_0の事前分布であるガンマ分布のrateパラメータ(1/θ)
 		std::vector<Restaurant> restaurants;
 		std::list<std::shared_ptr<Topic>> topics;
-		std::unordered_map<int, double> cacheLogNPlusBeta; // log({n_v + i} + β)のキャッシュ。{n_v + i}がキー
-		std::unordered_map<int, double> cacheLogNPlusVBeta; // log({n_. + i} + Vβ)のキャッシュ。{n_. + i}がキー
 		int m; // 全店のテーブル数の合計
 	};
 }

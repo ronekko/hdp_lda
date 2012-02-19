@@ -74,7 +74,7 @@ int main(int argc, char** argv)
 	const int ITERATION = 2000;
 	const int INTERVAL = 50;
 	const double GAMMA = 0.1;
-	const double ALPHA0 = 35;
+	const double ALPHA0 = 10;
 	const double BETA = 0.5;
 
 	const string corpusName = "kos";	// K=15~18Ç†ÇΩÇËÇ™ç≈ëP
