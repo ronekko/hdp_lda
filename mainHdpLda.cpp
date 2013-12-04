@@ -20,15 +20,15 @@
 #include "Corpus.hpp"
 
 #ifdef _DEBUG
-	#pragma comment(lib, "opencv_core231d.lib")
-	#pragma comment(lib, "opencv_imgproc231d.lib")
-	#pragma comment(lib, "opencv_highgui231d.lib")
-	#pragma comment(lib, "opencv_features2d231d.lib")
+	#pragma comment(lib, "opencv_core246d.lib")
+	#pragma comment(lib, "opencv_imgproc246d.lib")
+	#pragma comment(lib, "opencv_highgui246d.lib")
+	#pragma comment(lib, "opencv_features2d246d.lib")
 #else
-	#pragma comment(lib, "opencv_core231.lib")
-	#pragma comment(lib, "opencv_imgproc231.lib")
-	#pragma comment(lib, "opencv_highgui231.lib")
-	#pragma comment(lib, "opencv_features2d231.lib")
+	#pragma comment(lib, "opencv_core246.lib")
+	#pragma comment(lib, "opencv_imgproc246.lib")
+	#pragma comment(lib, "opencv_highgui246.lib")
+	#pragma comment(lib, "opencv_features2d246.lib")
 #endif
 
 using namespace std;
