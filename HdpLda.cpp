@@ -84,16 +84,12 @@ void HdpLda::sampleTables(void)
 			// 客がいなくなった場合はそのテーブルを削除
 			if(customers[i].table->n == 0){
 				shared_ptr<Topic> &topicOfThisTable = customers[i].table->topic;
-				tables.remove_if([](shared_ptr<Table> &table){
-					return table->n == 0;
-				});
+				tables.remove(customers[i].table);
 				topicOfThisTable->m--;
 				m--;
 				// 削除されたテーブルに乗っていた料理が、全レストランのどのテーブルにも提供されていなくなった場合はその料理をフランチャイズのメニューから削除
 				if(topicOfThisTable->m == 0){
-					topics.remove_if([](shared_ptr<Topic> &topic){
-						return topic->m == 0;
-					});
+					topics.remove(topicOfThisTable);
 				}
 			}
 
@@ -119,6 +115,7 @@ void HdpLda::sampleTables(void)
 					G0_v += (*topic)->m * (*topic)->phi_v[v]; //m_.k * φ_k(v)
 					G0_vk[k] = G0_v;
 					ptrTopics[k] = (*topic);
+					k++;
 				}
 				G0_v += gamma * (1.0 / static_cast<double>(V)); // γH(v), because H(v) = β/Vβ = 1/V
 				G0_vk[K] = G0_v;
@@ -246,9 +243,7 @@ void HdpLda::sampleTopics(void)
 			}
 			// 料理が提供されているテーブルがなくなったらメニューから料理を削除
 			if(oldTopic->m == 0){
-				topics.remove_if([](shared_ptr<Topic> &topic){
-					return topic->m == 0;
-				});
+				topics.remove(oldTopic);
 			}
 			else{	
 				oldTopic->n -= table->n;
